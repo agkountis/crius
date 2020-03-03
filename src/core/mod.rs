@@ -1,12 +1,14 @@
 pub mod application;
-pub mod ecs;
 pub mod event;
+pub mod execution_schedule;
 pub mod scene;
 pub mod window;
 
-use crate::core::window::WindowMode;
+pub use legion as ecs;
+
 use nalgebra::Vector2;
 use serde::{Deserialize, Serialize};
+use window::WindowMode;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub struct Version {

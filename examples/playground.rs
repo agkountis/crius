@@ -1,9 +1,6 @@
 use crius;
 
-use crius::core::application::Application;
-use crius::core::ecs::ExecutionScheduleBuilder;
-use crius::core::scene::Scene;
-use legion::system::SystemBuilder;
+use crius::prelude::*;
 
 pub struct MainScene;
 

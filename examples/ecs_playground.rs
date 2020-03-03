@@ -1,4 +1,3 @@
-use legion;
 use legion::prelude::*;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
