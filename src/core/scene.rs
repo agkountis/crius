@@ -9,8 +9,8 @@ pub enum Transition {
 }
 
 pub struct Context<'a> {
-    universe: &'a Universe,
-    world: &'a mut World,
+    pub universe: &'a Universe,
+    pub world: &'a mut World,
 }
 
 impl<'a> Context<'a> {

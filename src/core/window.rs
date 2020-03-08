@@ -1,4 +1,4 @@
-use legion::schedule::{Runnable, Schedulable};
+use legion::schedule::Schedulable;
 use legion::system::SystemBuilder;
 use winit::event::Event;
 use winit::event_loop::ControlFlow;
@@ -17,7 +17,8 @@ impl WindowSystem {
         SystemBuilder::new("window_system").build(|_, _, _, _| {
             let event_loop = winit::event_loop::EventLoop::new();
 
-            let window = WindowBuilder::new()
+            // TODO: FIX this crashes if used.
+            let _window = WindowBuilder::new()
                 .with_title("A fantastic window!")
                 .with_inner_size(winit::dpi::LogicalSize::new(128.0, 128.0))
                 .build(&event_loop)
