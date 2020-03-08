@@ -1,0 +1,12 @@
+[package]
+name = "crius"
+version = "0.1.0"
+authors = ["Angelos Gkountis <angelos.gkountis@gmail.com>"]
+edition = "2018"
+
+
+[dependencies]
+serde = { version = "1.0.104", features = ["derive"] }
+winit = { version = "0.21.0", features = ["serde"] }
+legion = "0.2.1"
+nalgebra = "0.19.0"
