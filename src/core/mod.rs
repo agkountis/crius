@@ -1,6 +1,4 @@
 pub mod application;
-pub mod event;
-pub mod execution_schedule;
 pub mod scene;
 pub mod window;
 

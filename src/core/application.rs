@@ -1,24 +1,24 @@
 //! The Application is the core component of crius.
 //! It manages the setup of the engine's sub-systems and
 //! runs the main loop.
-use crate::core::scene::{Scene, SceneManager};
-use legion::resource::Resources;
+use crate::core::scene::{Context, Scene, SceneManager};
+use crate::prelude::Schedule;
 use legion::world::{Universe, World};
 use winit::event::Event;
-use winit::event_loop::ControlFlow;
+use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 
-pub struct Application<'a, T>
-where
-    T: 'static,
-{
+pub struct Application<'a> {
     universe: Universe,
     world: World,
-    scene_manager: SceneManager<'a, T>,
+    scene_manager: SceneManager<'a>,
 }
 
-impl<'a, T> Application<'a, T> {
-    pub fn new<S: Scene<T> + 'a>(initial_scene: S) -> Self {
+impl<'a> Application<'a> {
+    pub fn new<S>(initial_scene: S) -> Self
+    where
+        S: Scene + 'a,
+    {
         let universe = Universe::new();
         let world = universe.create_world();
         Self {
@@ -28,32 +28,12 @@ impl<'a, T> Application<'a, T> {
         }
     }
 
-    pub fn run(&mut self) {
-        let event_loop = winit::event_loop::EventLoop::new();
-
-        // TODO: Move event loop and window management into separate ECS systems.
-        let window = WindowBuilder::new()
-            .with_title("A fantastic window!")
-            .with_inner_size(winit::dpi::LogicalSize::new(128.0, 128.0))
-            .build(&event_loop)
-            .unwrap();
-
-        event_loop.run(move |event, _, control_flow| {
-            *control_flow = ControlFlow::Poll;
-
-            match event {
-                Event::NewEvents(_) => {}
-                Event::WindowEvent { .. } => println!("Device event"),
-                Event::DeviceEvent { .. } => {}
-                Event::UserEvent(_) => {}
-                Event::Suspended => {}
-                Event::Resumed => {}
-                Event::MainEventsCleared => {}
-                Event::RedrawRequested(_) => {}
-                Event::RedrawEventsCleared => {}
-                Event::LoopDestroyed => {}
-            }
-        })
+    pub fn run(&mut self, mut schedule: Schedule) {
+        self.scene_manager
+            .initialize(Context::new(&self.universe, &mut self.world));
+        while self.scene_manager.is_running() {
+            schedule.execute(&mut self.world)
+        }
     }
 
     pub fn with_resource<R>(&mut self, resource: R) -> &mut Self
