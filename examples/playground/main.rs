@@ -1,6 +1,7 @@
 use crius;
 
 use crius::prelude::*;
+use winit::event::Event;
 
 pub struct MainScene;
 
@@ -18,7 +19,7 @@ struct Velocity {
     z: f32,
 }
 
-impl Scene for MainScene {
+impl Scene<()> for MainScene {
     fn start(&mut self, context: Context<'_>) {
         println!("Starting Scene!");
 
@@ -42,6 +43,25 @@ impl Scene for MainScene {
             }),
         );
     }
+
+    fn handle_event(&mut self, _context: Context, event: Event<()>) -> Transition<()> {
+        match event {
+            Event::NewEvents(_) => {}
+            Event::WindowEvent { window_id, event } => {
+                println!("WINDOW: {:?} -> EVENT: {:?}", window_id, event)
+            }
+            Event::DeviceEvent { .. } => {}
+            Event::UserEvent(_) => {}
+            Event::Suspended => {}
+            Event::Resumed => {}
+            Event::MainEventsCleared => {}
+            Event::RedrawRequested(_) => {}
+            Event::RedrawEventsCleared => {}
+            Event::LoopDestroyed => {}
+        }
+
+        Transition::None
+    }
 }
 
 #[derive(Debug)]
@@ -51,7 +71,7 @@ struct Resource3 {
 }
 
 fn main() {
-    Application::new(MainScene)
+    ApplicationBuilder::new(MainScene, "examples/playground")
         .with_resource(Resource3 {
             a: 30,
             b: "!!!".to_string(),
@@ -72,5 +92,6 @@ fn main() {
             system_builder.build_thread_local(|_, _, _, _| println!("Thread local system"))
         })
         .with_thread_local_fn(|_| println!("Thread local function!"))
+        .build()
         .run()
 }

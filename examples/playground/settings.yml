@@ -1,0 +1,19 @@
+---
+version:
+  major: 0
+  minor: 1
+  patch: 0
+assets_path: "./assets"
+window:
+  title: "Playground Application"
+  size:
+    width: 1024
+    height: 768
+  min_size: null
+  max_size: null
+  resizeable: true
+  maximized: false
+  visible: true
+  transparent: false
+  decorations: true
+  always_on_top: false

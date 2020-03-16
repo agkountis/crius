@@ -1,8 +1,9 @@
 use crate::ecs::world::{Universe, World};
+use winit::event::Event;
 
-pub enum Transition {
-    Push(Box<dyn Scene>),
-    Switch(Box<dyn Scene>),
+pub enum Transition<E> {
+    Push(Box<dyn Scene<E>>),
+    Switch(Box<dyn Scene<E>>),
     Pop,
     None,
     Quit,
@@ -20,15 +21,15 @@ impl<'a> Context<'a> {
 }
 
 //TODO: Add fixed update and late update
-pub trait Scene {
+pub trait Scene<E> {
     fn start(&mut self, _context: Context) {}
     fn stop(&mut self, _context: Context) {}
     fn pause(&mut self, _context: Context) {}
     fn resume(&mut self, _context: Context) {}
-    fn handle_event(&mut self, _context: Context) -> Transition {
+    fn handle_event(&mut self, _context: Context, _event: Event<E>) -> Transition<E> {
         Transition::None
     }
-    fn update(&mut self, _context: Context) -> Transition {
+    fn update(&mut self, _context: Context) -> Transition<E> {
         Transition::None
     }
     fn pre_draw(&mut self, _context: Context) {}
@@ -36,15 +37,15 @@ pub trait Scene {
     fn post_draw(&mut self, _context: Context) {}
 }
 
-pub struct SceneManager<'a> {
-    scenes: Vec<Box<dyn Scene + 'a>>,
+pub struct SceneManager<'a, E> {
+    scenes: Vec<Box<dyn Scene<E> + 'a>>,
     is_running: bool,
 }
 
-impl<'a> SceneManager<'a> {
+impl<'a, E> SceneManager<'a, E> {
     pub fn new<S>(initial_scene: S) -> Self
     where
-        S: Scene + 'a,
+        S: Scene<E> + 'a,
     {
         Self {
             scenes: vec![Box::new(initial_scene)],
@@ -70,11 +71,24 @@ impl<'a> SceneManager<'a> {
         }
     }
 
+    pub fn handle_event(&mut self, context: Context, event: Event<E>) {
+        let Context { universe, world } = context;
+
+        if self.is_running {
+            let transition = match self.scenes.last_mut() {
+                Some(scene) => scene.handle_event(Context::new(universe, world), event),
+                None => Transition::None,
+            };
+
+            self.handle_transition(transition, Context::new(universe, world))
+        }
+    }
+
     pub fn is_running(&self) -> bool {
         self.is_running
     }
 
-    fn handle_transition(&mut self, transition: Transition, context: Context) {
+    fn handle_transition(&mut self, transition: Transition<E>, context: Context) {
         let Context { universe, world } = context;
 
         match transition {
@@ -86,7 +100,7 @@ impl<'a> SceneManager<'a> {
         }
     }
 
-    fn push(&mut self, scene: Box<dyn Scene>, context: Context) {
+    fn push(&mut self, scene: Box<dyn Scene<E>>, context: Context) {
         let Context { universe, world } = context;
 
         if let Some(current) = self.scenes.last_mut() {

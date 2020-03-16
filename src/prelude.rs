@@ -1,5 +1,5 @@
 pub use crate::{
-    application::Application,
+    application::ApplicationBuilder,
     ecs::prelude::*,
     scene::{Context, Scene, Transition},
 };
