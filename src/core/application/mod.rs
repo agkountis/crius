@@ -5,8 +5,9 @@
 pub mod settings;
 
 use crate::core::application::settings::Settings;
-use crate::core::scene::{Context, Scene, SceneManager};
-use crate::prelude::Schedule;
+use crate::core::event::ApplicationEvent;
+use crate::core::scene::{Context, Scene, SceneManager, Transition};
+use crate::prelude::{Event, Schedule};
 use legion::schedule::{Builder, Runnable, Schedulable};
 use legion::system::SystemBuilder;
 use legion::world::{Universe, World};
@@ -14,21 +15,22 @@ use serde_yaml;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use winit::event::Event;
+use winit::event::Event as WinitEvent;
+use winit::event::WindowEvent as WinitWindowEvent;
 use winit::event_loop::ControlFlow;
-use winit::window::WindowBuilder;
+use winit::window::{Window, WindowBuilder};
 
 const APPLICATION_SETTINGS_FILE_NAME: &str = "settings.yml";
 
-pub struct Application<E: 'static> {
+pub struct Application {
     universe: Universe,
     world: World,
-    scene_manager: SceneManager<'static, E>,
+    scene_manager: SceneManager,
     schedule: Schedule,
     settings: Settings,
 }
 
-impl<E> Application<E> {
+impl Application {
     pub fn run(self) {
         let Application {
             mut universe,
@@ -40,7 +42,7 @@ impl<E> Application<E> {
 
         scene_manager.initialize(Context::new(&mut universe, &mut world));
 
-        let event_loop = winit::event_loop::EventLoop::with_user_event();
+        let event_loop = winit::event_loop::EventLoop::new();
 
         let mut window_builder = WindowBuilder::new()
             .with_title(settings.window.title)
@@ -71,38 +73,112 @@ impl<E> Application<E> {
             *control_flow = ControlFlow::Poll;
 
             match event {
-                Event::WindowEvent { .. } | Event::DeviceEvent { .. } | Event::UserEvent(..) => {
-                    scene_manager.handle_event(Context::new(&mut universe, &mut world), event)
+                WinitEvent::WindowEvent {
+                    event: WinitWindowEvent::CloseRequested,
+                    ..
+                } => *control_flow = ControlFlow::Exit,
+                WinitEvent::WindowEvent { event, .. } => {
+                    let transition = scene_manager
+                        .handle_event(Context::new(&universe, &mut world), Event::Window(event));
+                    Self::handle_transition(
+                        &mut scene_manager,
+                        transition,
+                        Context::new(&universe, &mut world),
+                        control_flow,
+                    )
                 }
-                Event::Suspended => {}
-                Event::Resumed => {}
-                Event::MainEventsCleared => {
-                    scene_manager.update(Context::new(&mut universe, &mut world));
-                    schedule.execute(&mut world)
+                WinitEvent::Suspended => {
+                    let transition = scene_manager.handle_event(
+                        Context::new(&universe, &mut world),
+                        Event::Application(ApplicationEvent::Suspended),
+                    );
+                    scene_manager.pause(Context::new(&mut universe, &mut world));
+                    *control_flow = ControlFlow::Wait;
+                    Self::handle_transition(
+                        &mut scene_manager,
+                        transition,
+                        Context::new(&universe, &mut world),
+                        control_flow,
+                    );
                 }
-                Event::RedrawRequested(window_id) => {
-                    println!("WINDOW: {:?} -> REDRAW REQUESTED", window_id)
+                WinitEvent::Resumed => {
+                    let transition = scene_manager.handle_event(
+                        Context::new(&universe, &mut world),
+                        Event::Application(ApplicationEvent::Resumed),
+                    );
+                    scene_manager.resume(Context::new(&universe, &mut world));
+                    *control_flow = ControlFlow::Poll;
+                    Self::handle_transition(
+                        &mut scene_manager,
+                        transition,
+                        Context::new(&universe, &mut world),
+                        control_flow,
+                    )
                 }
-                Event::RedrawEventsCleared => {}
-                Event::LoopDestroyed => {}
-                Event::NewEvents(_) => {}
+                WinitEvent::MainEventsCleared => {
+                    let transition = scene_manager.update(Context::new(&mut universe, &mut world));
+                    Self::handle_transition(
+                        &mut scene_manager,
+                        transition,
+                        Context::new(&universe, &mut world),
+                        control_flow,
+                    );
+                    world.resources.get::<Window>().unwrap().request_redraw()
+                }
+                WinitEvent::RedrawRequested(_) => {
+                    schedule.execute(&mut world);
+                }
+                WinitEvent::LoopDestroyed => {
+                    // Event loop is being destroyed, no more transitions will be handled.
+                    scene_manager.handle_event(
+                        Context::new(&universe, &mut world),
+                        Event::Application(ApplicationEvent::Terminating),
+                    );
+                    scene_manager.stop(Context::new(&mut universe, &mut world))
+                }
+                _ => {}
             }
         })
     }
+
+    fn handle_transition(
+        scene_manager: &mut SceneManager,
+        transition: Transition,
+        context: Context,
+        control_flow: &mut ControlFlow,
+    ) {
+        let Context { universe, world } = context;
+
+        match transition {
+            Transition::Push(scene) => scene_manager.push(scene, Context::new(universe, world)),
+            Transition::Switch(_) => {}
+            Transition::Pop => {}
+            Transition::Quit => {
+                *control_flow = ControlFlow::Exit;
+            }
+            _ => {}
+        }
+    }
 }
 
-pub struct ApplicationBuilder<'a, E> {
+pub struct ApplicationBuilder<P>
+where
+    P: AsRef<Path>,
+{
     universe: Universe,
     world: World,
-    scene_manager: SceneManager<'static, E>,
+    scene_manager: SceneManager,
     schedule_builder: Builder,
-    working_directory: &'a str,
+    working_directory: P,
 }
 
-impl<'a, E> ApplicationBuilder<'a, E> {
-    pub fn new<S>(initial_scene: S, working_directory: &'a str) -> Self
+impl<P> ApplicationBuilder<P>
+where
+    P: AsRef<Path>,
+{
+    pub fn new<S>(initial_scene: S, working_directory: P) -> Self
     where
-        S: Scene<E> + 'static,
+        S: Scene + 'static,
     {
         let universe = Universe::new();
         let world = universe.create_world();
@@ -151,16 +227,19 @@ impl<'a, E> ApplicationBuilder<'a, E> {
         self
     }
 
-    pub fn barrier(mut self) -> Self {
+    pub fn flush(mut self) -> Self {
         self.schedule_builder = self.schedule_builder.flush();
         self
     }
 
-    pub fn build(self) -> Application<E> {
+    pub fn build(self) -> Application {
         let settings: Settings = {
-            let mut file =
-                File::open(Path::new(self.working_directory).join(APPLICATION_SETTINGS_FILE_NAME))
-                    .expect("Failed to open settings.yml file.");
+            let mut file = File::open(
+                self.working_directory
+                    .as_ref()
+                    .join(APPLICATION_SETTINGS_FILE_NAME),
+            )
+            .expect("Failed to open settings.yml file.");
             let mut buffer = vec![];
             file.read_to_end(&mut buffer)
                 .expect("Failed to read settings.yml file");

@@ -1,7 +1,4 @@
-use crius;
-
 use crius::prelude::*;
-use winit::event::Event;
 
 pub struct MainScene;
 
@@ -19,8 +16,8 @@ struct Velocity {
     z: f32,
 }
 
-impl Scene<()> for MainScene {
-    fn start(&mut self, context: Context<'_>) {
+impl Scene for MainScene {
+    fn start(&mut self, context: Context) {
         println!("Starting Scene!");
 
         let Context { universe: _, world } = context;
@@ -42,25 +39,6 @@ impl Scene<()> for MainScene {
                 )
             }),
         );
-    }
-
-    fn handle_event(&mut self, _context: Context, event: Event<()>) -> Transition<()> {
-        match event {
-            Event::NewEvents(_) => {}
-            Event::WindowEvent { window_id, event } => {
-                println!("WINDOW: {:?} -> EVENT: {:?}", window_id, event)
-            }
-            Event::DeviceEvent { .. } => {}
-            Event::UserEvent(_) => {}
-            Event::Suspended => {}
-            Event::Resumed => {}
-            Event::MainEventsCleared => {}
-            Event::RedrawRequested(_) => {}
-            Event::RedrawEventsCleared => {}
-            Event::LoopDestroyed => {}
-        }
-
-        Transition::None
     }
 }
 
@@ -87,7 +65,7 @@ fn main() {
                         .for_each(|(pos, vel)| println!("Debug: ({:?} {:?})", pos, vel))
                 })
         })
-        .barrier()
+        .flush()
         .with_thread_local_system("thread_local_sys", |_, system_builder| {
             system_builder.build_thread_local(|_, _, _, _| println!("Thread local system"))
         })
