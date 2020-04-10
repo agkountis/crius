@@ -1,4 +1,5 @@
 use crate::ecs::world::{Universe, World};
+use crate::event::Event;
 
 pub enum Transition {
     Push(Box<dyn Scene>),
@@ -21,30 +22,30 @@ impl<'a> Context<'a> {
 
 //TODO: Add fixed update and late update
 pub trait Scene {
-    fn start(&mut self, _context: Context) {}
-    fn stop(&mut self, _context: Context) {}
-    fn pause(&mut self, _context: Context) {}
-    fn resume(&mut self, _context: Context) {}
-    fn handle_event(&mut self, _context: Context) -> Transition {
+    fn start(&mut self, context: Context) {}
+    fn stop(&mut self, context: Context) {}
+    fn pause(&mut self, context: Context) {}
+    fn resume(&mut self, context: Context) {}
+    fn handle_event(&mut self, context: Context, event: Event) -> Transition {
         Transition::None
     }
-    fn update(&mut self, _context: Context) -> Transition {
+    fn update(&mut self, context: Context) -> Transition {
         Transition::None
     }
-    fn pre_draw(&mut self, _context: Context) {}
-    fn draw(&mut self, _context: Context) {}
-    fn post_draw(&mut self, _context: Context) {}
+    fn pre_draw(&mut self, context: Context) {}
+    fn draw(&mut self, context: Context) {}
+    fn post_draw(&mut self, context: Context) {}
 }
 
-pub struct SceneManager<'a> {
-    scenes: Vec<Box<dyn Scene + 'a>>,
+pub struct SceneManager {
+    scenes: Vec<Box<dyn Scene>>,
     is_running: bool,
 }
 
-impl<'a> SceneManager<'a> {
+impl SceneManager {
     pub fn new<S>(initial_scene: S) -> Self
     where
-        S: Scene + 'a,
+        S: Scene + 'static,
     {
         Self {
             scenes: vec![Box::new(initial_scene)],
@@ -52,21 +53,42 @@ impl<'a> SceneManager<'a> {
         }
     }
 
-    pub fn initialize(&mut self, context: Context) {
+    pub(crate) fn initialize(&mut self, context: Context) {
         self.scenes.last_mut().unwrap().start(context);
         self.is_running = true
     }
 
-    pub fn update(&mut self, context: Context) {
+    pub(crate) fn update(&mut self, context: Context) -> Transition {
         let Context { universe, world } = context;
 
-        if self.is_running {
-            let transition = match self.scenes.last_mut() {
-                Some(scene) => scene.update(Context::new(universe, world)),
-                None => Transition::None,
-            };
+        match self.scenes.last_mut() {
+            Some(scene) => scene.update(Context::new(universe, world)),
+            None => Transition::None,
+        }
+    }
 
-            self.handle_transition(transition, Context::new(universe, world))
+    pub(crate) fn handle_event(&mut self, context: Context, event: Event) -> Transition {
+        let Context { universe, world } = context;
+
+        match self.scenes.last_mut() {
+            Some(scene) => scene.handle_event(Context::new(universe, world), event),
+            None => Transition::None,
+        }
+    }
+
+    pub(crate) fn pause(&mut self, context: Context) {
+        let Context { universe, world } = context;
+
+        if let Some(scene) = self.scenes.last_mut() {
+            scene.pause(Context::new(universe, world))
+        }
+    }
+
+    pub(crate) fn resume(&mut self, context: Context) {
+        let Context { universe, world } = context;
+
+        if let Some(scene) = self.scenes.last_mut() {
+            scene.resume(Context::new(universe, world))
         }
     }
 
@@ -74,19 +96,7 @@ impl<'a> SceneManager<'a> {
         self.is_running
     }
 
-    fn handle_transition(&mut self, transition: Transition, context: Context) {
-        let Context { universe, world } = context;
-
-        match transition {
-            Transition::Push(scene) => self.push(scene, Context::new(universe, world)),
-            Transition::Switch(_) => {}
-            Transition::Pop => {}
-            Transition::None => {}
-            Transition::Quit => self.stop(Context::new(universe, world)),
-        }
-    }
-
-    fn push(&mut self, scene: Box<dyn Scene>, context: Context) {
+    pub(crate) fn push(&mut self, scene: Box<dyn Scene>, context: Context) {
         let Context { universe, world } = context;
 
         if let Some(current) = self.scenes.last_mut() {

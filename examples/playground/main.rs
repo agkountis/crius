@@ -1,5 +1,3 @@
-use crius;
-
 use crius::prelude::*;
 
 pub struct MainScene;
@@ -19,7 +17,7 @@ struct Velocity {
 }
 
 impl Scene for MainScene {
-    fn start(&mut self, context: Context<'_>) {
+    fn start(&mut self, context: Context) {
         println!("Starting Scene!");
 
         let Context { universe: _, world } = context;
@@ -51,7 +49,7 @@ struct Resource3 {
 }
 
 fn main() {
-    Application::new(MainScene)
+    ApplicationBuilder::new(MainScene, "examples/playground")
         .with_resource(Resource3 {
             a: 30,
             b: "!!!".to_string(),
@@ -67,10 +65,11 @@ fn main() {
                         .for_each(|(pos, vel)| println!("Debug: ({:?} {:?})", pos, vel))
                 })
         })
-        .barrier()
+        .flush()
         .with_thread_local_system("thread_local_sys", |_, system_builder| {
             system_builder.build_thread_local(|_, _, _, _| println!("Thread local system"))
         })
         .with_thread_local_fn(|_| println!("Thread local function!"))
+        .build()
         .run()
 }
