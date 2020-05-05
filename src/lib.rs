@@ -1,4 +1,5 @@
 mod core;
+mod graphics;
 
 pub mod prelude;
 

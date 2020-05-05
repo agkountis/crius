@@ -1,6 +1,6 @@
 [package]
 name = "crius"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Angelos Gkountis <angelos.gkountis@gmail.com>"]
 edition = "2018"
 
@@ -11,3 +11,8 @@ serde_yaml = "^0.8.0"
 winit = { version = "^0.22.0", features = ["serde"] }
 legion = "^0.2.0"
 nalgebra = "^0.19.0"
+ash = "^0.30.0"
+vk-mem = "^0.2.0"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3.4", features = ["windef", "winuser"] }

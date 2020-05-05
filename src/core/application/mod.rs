@@ -7,6 +7,7 @@ pub mod settings;
 use crate::core::application::settings::Settings;
 use crate::core::event::ApplicationEvent;
 use crate::core::scene::{Context, Scene, SceneManager, Transition};
+use crate::graphics::Graphics;
 use crate::prelude::{Event, Schedule};
 use legion::schedule::{Builder, Runnable, Schedulable};
 use legion::system::SystemBuilder;
@@ -67,7 +68,10 @@ impl Application {
 
         let window = window_builder.build(&event_loop).unwrap();
 
+        let graphics = Graphics::new(&window).expect("Failed to init graphics.");
+
         world.resources.insert(window);
+        world.resources.insert(graphics);
 
         event_loop.run(move |event, _, control_flow| {
             *control_flow = ControlFlow::Poll;
