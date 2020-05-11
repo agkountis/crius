@@ -1,11 +1,19 @@
 use serde::{Deserialize, Serialize};
+use std::ffi::{CStr, CString};
 use winit::dpi::LogicalSize;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Settings {
+    pub application: ApplicationSettings,
+    pub window: WindowSettings,
+    pub graphics: GraphicsSettings,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ApplicationSettings {
+    pub name: String,
     pub version: Version,
     pub assets_path: String,
-    pub window: WindowSettings,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -22,7 +30,13 @@ pub struct WindowSettings {
     pub always_on_top: bool,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
+pub struct GraphicsSettings {
+    pub extensions: Option<Vec<CString>>,
+    pub layers: Option<Vec<CString>>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 pub struct Version {
     pub major: u32,
     pub minor: u32,

@@ -1,5 +1,10 @@
 use crius::event::{EventChannel, KeyboardInput, VirtualKeyCode, WindowEvent};
+use crius::graphics::{
+    api::image::{Image, ImageView},
+    Graphics,
+};
 use crius::prelude::*;
+use std::sync::Arc;
 use winit::event::ElementState;
 
 pub struct MainScene;
@@ -11,6 +16,53 @@ pub enum MyCustomEvent {
 }
 
 impl Scene for MainScene {
+    fn start(&mut self, context: Context) {
+        let Context { world, .. } = context;
+
+        if let Some(graphics) = world.resources.get::<Arc<Graphics>>() {
+            let image = Image::new(
+                Arc::clone(&graphics),
+                ash::vk::Extent3D {
+                    width: 256,
+                    height: 256,
+                    depth: 1,
+                },
+                ash::vk::Format::R8G8B8A8_SRGB,
+                ash::vk::ImageUsageFlags::SAMPLED,
+                vk_mem::MemoryUsage::GpuOnly,
+                ash::vk::SampleCountFlags::TYPE_1,
+                ash::vk::ImageTiling::OPTIMAL,
+                1,
+                1,
+                ash::vk::ImageCreateFlags::empty(),
+            )
+            .unwrap();
+
+            let image_view = ImageView::new(
+                Arc::clone(&graphics),
+                &image,
+                image.format(),
+                ash::vk::ImageViewType::TYPE_2D,
+                ash::vk::ImageAspectFlags::COLOR,
+                ash::vk::ComponentMapping {
+                    r: ash::vk::ComponentSwizzle::R,
+                    g: ash::vk::ComponentSwizzle::G,
+                    b: ash::vk::ComponentSwizzle::B,
+                    a: ash::vk::ComponentSwizzle::A,
+                },
+                0,
+                1,
+                0,
+                1,
+            )
+            .unwrap();
+
+            println!("Starting!")
+        } else {
+            println!("Graphics not found!")
+        }
+    }
+
     fn stop(&mut self, context: Context) {
         println!("Stopping scene");
     }

@@ -1,9 +1,11 @@
 ---
-version:
-  major: 0
-  minor: 1
-  patch: 0
-assets_path: "./assets"
+application:
+  name: "Playground Application"
+  version:
+    major: 0
+    minor: 1
+    patch: 0
+  assets_path: "./assets"
 window:
   title: "Playground Application"
   size:
@@ -17,3 +19,6 @@ window:
   transparent: false
   decorations: true
   always_on_top: false
+graphics:
+  extensions: null
+  layers: null

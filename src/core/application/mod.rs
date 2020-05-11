@@ -16,6 +16,7 @@ use serde_yaml;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::sync::Arc;
 use winit::event::Event as WinitEvent;
 use winit::event::WindowEvent as WinitWindowEvent;
 use winit::event_loop::ControlFlow;
@@ -41,12 +42,10 @@ impl Application {
             settings,
         } = self;
 
-        scene_manager.initialize(Context::new(&mut universe, &mut world));
-
         let event_loop = winit::event_loop::EventLoop::new();
 
         let mut window_builder = WindowBuilder::new()
-            .with_title(settings.window.title)
+            .with_title(&settings.window.title)
             .with_resizable(settings.window.resizeable)
             .with_maximized(settings.window.maximized)
             .with_visible(settings.window.visible)
@@ -68,10 +67,12 @@ impl Application {
 
         let window = window_builder.build(&event_loop).unwrap();
 
-        let graphics = Graphics::new(&window).expect("Failed to init graphics.");
+        let graphics = Graphics::new(&settings, &window).expect("Failed to init graphics.");
 
         world.resources.insert(window);
-        world.resources.insert(graphics);
+        world.resources.insert(Arc::new(graphics));
+
+        scene_manager.initialize(Context::new(&mut universe, &mut world));
 
         event_loop.run(move |event, _, control_flow| {
             *control_flow = ControlFlow::Poll;

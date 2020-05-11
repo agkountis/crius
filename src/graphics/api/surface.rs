@@ -4,7 +4,7 @@ use ash::{
     vk,
 };
 
-use winit::platform::unix::WindowExtUnix;
+use std::ffi::{CStr, CString};
 use winit::window::Window;
 
 pub struct Surface {
@@ -15,7 +15,7 @@ pub struct Surface {
 }
 
 impl Surface {
-    pub fn new<E: EntryV1_0, I: InstanceV1_0>(
+    pub(crate) fn new<E: EntryV1_0, I: InstanceV1_0>(
         entry: &E,
         instance: &I,
         window: &Window,
@@ -31,16 +31,29 @@ impl Surface {
         })
     }
 
-    pub fn loader(&self) -> &khr::Surface {
+    pub(crate) fn loader(&self) -> &khr::Surface {
         &self.loader
     }
 
-    pub fn handle(&self) -> vk::SurfaceKHR {
+    pub(crate) fn handle(&self) -> vk::SurfaceKHR {
         self.handle
     }
 
-    pub fn format(&self) -> vk::SurfaceFormatKHR {
+    pub(crate) fn format(&self) -> vk::SurfaceFormatKHR {
         self.format
+    }
+
+    #[cfg(all(unix, not(target_os = "android"), not(target_os = "macos")))]
+    pub(crate) fn extensions() -> Vec<&Cstr> {
+        vec![khr::Surface::name(), khr::XlibSurface::name()]
+    }
+
+    #[cfg(target_os = "windows")]
+    pub(crate) fn extensions() -> Vec<CString> {
+        vec![
+            khr::Surface::name().into(),
+            khr::Win32Surface::name().into(),
+        ]
     }
 
     #[cfg(all(unix, not(target_os = "android"), not(target_os = "macos")))]
@@ -50,6 +63,7 @@ impl Surface {
         window: &winit::window::Window,
     ) -> Result<vk::SurfaceKHR, vk::Result> {
         use ash::extensions::khr::XlibSurface;
+        use winit::platform::unix::WindowExtUnix;
 
         let x11_display = window.xlib_display().unwrap();
         let x11_window = window.xlib_window().unwrap();
@@ -65,14 +79,16 @@ impl Surface {
     unsafe fn create_surface<E: EntryV1_0, I: InstanceV1_0>(
         entry: &E,
         instance: &I,
-        window: &winit::Window,
+        window: &winit::window::Window,
     ) -> Result<vk::SurfaceKHR, vk::Result> {
+        use ash::extensions::khr::Win32Surface;
+        use std::ffi::c_void;
         use std::ptr;
         use winapi::shared::windef::HWND;
         use winapi::um::libloaderapi::GetModuleHandleW;
-        use winit::platform::windows::WindowExt;
+        use winit::platform::windows::WindowExtWindows;
 
-        let hwnd = window.get_hwnd() as HWND;
+        let hwnd = window.hwnd() as HWND;
         let hinstance = GetModuleHandleW(ptr::null()) as *const c_void;
         let win32_create_info = vk::Win32SurfaceCreateInfoKHR {
             s_type: vk::StructureType::WIN32_SURFACE_CREATE_INFO_KHR,

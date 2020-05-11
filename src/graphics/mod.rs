@@ -1,31 +1,35 @@
-mod surface;
+pub mod api;
 
-use crate::graphics::surface::Surface;
+use crate::application::settings::Settings;
+use crate::graphics::api::semaphore::TimelineSemaphore;
+use crate::graphics::api::surface::Surface;
 use ash::extensions::ext::DebugReport;
 use ash::extensions::khr;
 use ash::extensions::khr::{Swapchain, XlibSurface};
-use ash::version::InstanceV1_0;
+use ash::version::{DeviceV1_2, InstanceV1_0};
 use ash::{version::EntryV1_0, vk, Device, Entry, Instance};
+use std::borrow::Borrow;
 use std::error::Error;
 use std::ffi::{CStr, CString};
+use vk_mem as vma;
 use winit::window::Window;
+
+const ENGINE_VERSION_MAJOR: &'static str = env!("CARGO_PKG_VERSION_MAJOR");
+const ENGINE_VERSION_MINOR: &'static str = env!("CARGO_PKG_VERSION_MINOR");
+const ENGINE_VERSION_PATCH: &'static str = env!("CARGO_PKG_VERSION_PATCH");
 
 pub struct Graphics {
     instance: Instance,
     device: Device,
     entry: Entry,
-    allocator: vk_mem::Allocator,
+    allocator: vma::Allocator,
 }
 
 impl Graphics {
-    pub(crate) fn new(window: &Window) -> Result<Self, Box<dyn Error>> {
+    pub(crate) fn new(settings: &Settings, window: &Window) -> Result<Self, Box<dyn Error>> {
         let entry = Entry::new()?;
-        let instance = Self::create_instance(
-            &entry,
-            vec![khr::Surface::name(), khr::XlibSurface::name()],
-            vec![],
-            None,
-        )?;
+
+        let instance = Self::create_instance(&entry, settings, None)?;
 
         let physical_devices =
             unsafe { instance.enumerate_physical_devices() }.expect("Physical device error");
@@ -94,7 +98,7 @@ impl Graphics {
             heap_size_limits: None,
         };
 
-        let allocator = vk_mem::Allocator::new(&allocator_create_info)?;
+        let allocator = vma::Allocator::new(&allocator_create_info)?;
 
         Ok(Self {
             instance,
@@ -104,22 +108,43 @@ impl Graphics {
         })
     }
 
+    pub fn allocator(&self) -> &vma::Allocator {
+        &self.allocator
+    }
+
     fn create_instance(
         entry: &Entry,
-        extensions: Vec<&CStr>,
-        layers: Vec<CString>,
+        settings: &Settings,
         allocation_callbacks: Option<&vk::AllocationCallbacks>,
     ) -> Result<Instance, Box<dyn Error>> {
-        let app_name = CString::new("Test app")?;
+        let app_name = CString::new(settings.application.name.as_bytes())?;
         let engine_name = CString::new("Crius Engine")?;
+
         let app_info = vk::ApplicationInfo::builder()
-            .application_name(app_name.as_c_str())
-            .application_version(vk::make_version(1, 0, 0))
-            .engine_name(engine_name.as_c_str())
-            .engine_version(vk::make_version(0, 2, 0))
+            .application_name(&app_name)
+            .application_version(vk::make_version(
+                settings.application.version.major,
+                settings.application.version.minor,
+                settings.application.version.patch,
+            ))
+            .engine_name(&engine_name)
+            .engine_version(vk::make_version(
+                ENGINE_VERSION_MAJOR.parse()?,
+                ENGINE_VERSION_MINOR.parse()?,
+                ENGINE_VERSION_PATCH.parse()?,
+            ))
             .api_version(vk::make_version(1, 2, 0));
 
+        let mut extensions = settings.graphics.extensions.clone().unwrap_or(vec![]);
+        extensions.extend(Surface::extensions());
+
         let raw_ptr_extensions = extensions.iter().map(|e| e.as_ptr()).collect::<Vec<_>>();
+
+        let mut layers = settings.graphics.layers.clone().unwrap_or(vec![]);
+
+        if cfg!(debug_assertions) {
+            layers.push(CString::new("VK_LAYER_KHRONOS_validation")?)
+        }
 
         let raw_ptr_layers = layers
             .iter()
@@ -148,4 +173,28 @@ impl Graphics {
 
         Ok(instance)
     }
+
+    pub fn wait_semaphores(
+        &self,
+        timeline_semaphores: &[TimelineSemaphore],
+        wait_values: &[u64],
+        timeout: u64,
+    ) -> Result<(), Box<dyn Error>> {
+        let semaphore_wait_info = vk::SemaphoreWaitInfo::builder()
+            .semaphores(
+                &timeline_semaphores
+                    .iter()
+                    .map(|semaphore| semaphore.handle())
+                    .collect::<Vec<_>>(),
+            )
+            .values(wait_values)
+            .build();
+
+        Ok(unsafe {
+            self.device
+                .wait_semaphores(self.device.handle(), &semaphore_wait_info, timeout)?
+        })
+    }
+
+    // fn select_physical_device() -> Result<vk::PhysicalDevice, Box<dyn Error>> {}
 }

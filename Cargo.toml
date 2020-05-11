@@ -13,6 +13,7 @@ legion = "^0.2.0"
 nalgebra = "^0.19.0"
 ash = "^0.30.0"
 vk-mem = "^0.2.0"
+snafu = "^0.6.0"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.4", features = ["windef", "winuser"] }
